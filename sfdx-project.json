@@ -5,6 +5,7 @@
         "default": true
       }
     ],
+    "name": "P9-Ameliorez-organisation-Salesforce-pour-votre-entreprise",
     "namespace": "",
     "sfdcLoginUrl": "https://login.salesforce.com",
     "sourceApiVersion": "60.0"
