@@ -1,29 +1,62 @@
-/**
- * This class contains unit tests for validating the behavior of Apex classes
- * and triggers.
- *
- * Unit tests are class methods that verify whether a particular piece
- * of code is working properly. Unit test methods take no arguments,
- * commit no data to the database, and are flagged with the testMethod
- * keyword in the method definition.
- *
- * All test methods in an org are executed whenever Apex code is deployed
- * to a production org to confirm correctness, ensure code
- * coverage, and prevent regressions. All Apex classes are
- * required to have at least 75% code coverage in order to be deployed
- * to a production org. In addition, all triggers must have some code coverage.
- * 
- * The @isTest class annotation indicates this class only contains test
- * methods. Classes defined with the @isTest annotation do not count against
- * the org size limit for all Apex scripts.
- *
- * See the Apex Language Reference for more information about Testing and Code Coverage.
- */
 @isTest
-private class TestDataFactory {
+public class TestDataFactory {
 
-    @isTest
-    static void myUnitTest() {
-        // TO DO: implement unit test
+    public static Id createProductAndPricebookEntry() {
+        Product2 product = new Product2(Name = 'Test Product', IsActive = true);
+        insert product;
+
+        PricebookEntry pbe = new PricebookEntry(
+            Product2Id = product.Id,
+            Pricebook2Id = Test.getStandardPricebookId(),
+            UnitPrice = 100,
+            IsActive = true
+        );
+        insert pbe;
+
+        return pbe.Id;
+    }
+
+    public static Account createAccount(String name) {
+        Account acc = new Account(Name = name);
+        insert acc;
+        return acc;
+    }
+
+    public static Order createOrder(Id accountId, Id pricebookId, String status, Decimal totalAmount, Decimal shipmentCost) {
+        Order ord = new Order(
+            AccountId = accountId,
+            Status = status,
+            EffectiveDate = Date.today(),
+            Pricebook2Id = pricebookId,
+            TotalAmount = totalAmount,
+            ShipmentCost__c = shipmentCost
+        );
+        insert ord;
+        return ord;
+    }
+
+    public static OrderItem createOrderItem(Id orderId, Id pbeId, Integer quantity, Decimal unitPrice) {
+        OrderItem item = new OrderItem(
+            OrderId = orderId,
+            PricebookEntryId = pbeId,
+            Quantity = quantity,
+            UnitPrice = unitPrice
+        );
+        insert item;
+        return item;
+    }
+
+    public static Map<String, Object> createCompleteOrderData(Boolean activatedStatus) {
+        Account acc = createAccount('Account - ' + (activatedStatus ? 'Active' : 'Draft'));
+        Id pbeId = createProductAndPricebookEntry();
+        String status = activatedStatus ? 'Activated' : 'Draft';
+        Order ord = createOrder(acc.Id, Test.getStandardPricebookId(), status, 200, 20);
+        OrderItem item = createOrderItem(ord.Id, pbeId, 1, 200);
+
+        return new Map<String, Object>{
+            'Account' => acc,
+            'Order' => ord,
+            'OrderItem' => item
+        };
     }
 }

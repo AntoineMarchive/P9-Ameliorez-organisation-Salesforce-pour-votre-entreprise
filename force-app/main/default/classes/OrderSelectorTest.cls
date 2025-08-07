@@ -1,29 +1,62 @@
-/**
- * This class contains unit tests for validating the behavior of Apex classes
- * and triggers.
- *
- * Unit tests are class methods that verify whether a particular piece
- * of code is working properly. Unit test methods take no arguments,
- * commit no data to the database, and are flagged with the testMethod
- * keyword in the method definition.
- *
- * All test methods in an org are executed whenever Apex code is deployed
- * to a production org to confirm correctness, ensure code
- * coverage, and prevent regressions. All Apex classes are
- * required to have at least 75% code coverage in order to be deployed
- * to a production org. In addition, all triggers must have some code coverage.
- * 
- * The @isTest class annotation indicates this class only contains test
- * methods. Classes defined with the @isTest annotation do not count against
- * the org size limit for all Apex scripts.
- *
- * See the Apex Language Reference for more information about Testing and Code Coverage.
- */
 @isTest
 private class OrderSelectorTest {
 
     @isTest
-    static void myUnitTest() {
-        // TO DO: implement unit test
+    static void test_getSumActivatedOrderByAccountIds() {
+        // 1. Créer deux comptes
+        Account acc1 = new Account(Name = 'Account 1');
+        Account acc2 = new Account(Name = 'Account 2');
+        insert new List<Account>{ acc1, acc2 };
+
+        // 2. Créer un produit et pricebook
+        Product2 prod = new Product2(Name = 'Produit Test', IsActive = true);
+        insert prod;
+
+        PricebookEntry pbe = new PricebookEntry(
+            Product2Id = prod.Id,
+            Pricebook2Id = Test.getStandardPricebookId(),
+            UnitPrice = 150,
+            IsActive = true
+        );
+        insert pbe;
+
+        // 3. Créer deux commandes activées
+        Order ord1 = new Order(
+            AccountId = acc1.Id,
+            Status = 'Activated',
+            EffectiveDate = Date.today(),
+            Pricebook2Id = Test.getStandardPricebookId()
+        );
+        Order ord2 = new Order(
+            AccountId = acc2.Id,
+            Status = 'Activated',
+            EffectiveDate = Date.today(),
+            Pricebook2Id = Test.getStandardPricebookId()
+        );
+        insert new List<Order>{ ord1, ord2 };
+
+        // 4. Ajouter des OrderItems
+        insert new List<OrderItem>{
+            new OrderItem(OrderId = ord1.Id, Quantity = 1, UnitPrice = 150, PricebookEntryId = pbe.Id),
+            new OrderItem(OrderId = ord2.Id, Quantity = 2, UnitPrice = 150, PricebookEntryId = pbe.Id)
+        };
+
+        // 5. Appel de la méthode à tester
+        Set<Id> accountIds = new Set<Id>{ acc1.Id, acc2.Id };
+
+        Test.startTest();
+        List<AggregateResult> results = OrderSelector.getSumActivatedOrderByAccountIds(accountIds);
+        Test.stopTest();
+
+        // 6. Vérification des résultats
+        System.assertEquals(2, results.size(), 'Deux comptes doivent être retournés');
+        
+        Map<Id, Decimal> resultMap = new Map<Id, Decimal>();
+        for (AggregateResult ar : results) {
+            resultMap.put((Id) ar.get('AccountId'), (Decimal) ar.get('total'));
+        }
+
+        System.assertEquals(150, resultMap.get(acc1.Id));
+        System.assertEquals(300, resultMap.get(acc2.Id));
     }
 }
