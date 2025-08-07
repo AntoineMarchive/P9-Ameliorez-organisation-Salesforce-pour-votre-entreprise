@@ -1,0 +1,71 @@
+name: Deploy and Validate Metadata
+
+# Déclenche le pipeline à chaque push ou pull request sur la branche main
+on:
+  pull_request:
+    branches:
+      - main
+  push: 
+    branches:
+      - main
+
+jobs:
+
+  # === JOB 1 : Déploiement en production ===
+  deploy-to-main:
+    name: "Deploy Metadata to Main Org"
+    runs-on: ubuntu-latest
+
+    steps:
+      # Étape 1 : Clone du repo à nouveau (obligatoire à chaque job)
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Étape 2 : Setup de Node.js
+      - name: Use Node.js 18.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+
+      # Étape 3 : Installation de Salesforce CLI + plugin delta
+      - name: Install SFDX CLI and delta plugin
+        run: |
+          npm install -g @salesforce/cli@latest
+          echo "y" | sf plugins install sfdx-git-delta
+
+      # Étape 4 : Authentification sécurisée (via secrets GitHub)
+      - name: JWT Auth to Main Org
+        env:
+          SFDX_CLIENT_ID: ${{ secrets.SFDX_CLIENT_ID }}
+          SFDX_HUB_USERNAME: ${{ secrets.SFDX_HUB_USERNAME }}
+          SFDX_JWT_KEY: ${{ secrets.SFDX_JWT_KEY }}
+        run: |
+          echo "$SFDX_JWT_KEY" > server.key
+          sf org login jwt \
+            --client-id "$SFDX_CLIENT_ID" \
+            --username "$SFDX_HUB_USERNAME" \
+            --key-file server.key \
+            --alias prodOrg \
+            --set-default
+
+      # Étape 5 : Génération du delta entre les deux derniers commits
+      - name: Generate delta between commits
+        run: |
+          mkdir -p .delta
+          sf sgd source delta \
+            --to "HEAD" \
+            --from "HEAD~1" \
+            --output-dir .delta \
+            --generate-delta
+
+      # Étape 6 : Déploiement des métadonnées générées par le delta
+      - name: Deploy metadata from delta
+        if: github.ref == 'refs/heads/main'
+        run: |
+          sf project deploy start \
+            --target-org prodOrg \
+            --manifest .delta/package/package.xml \
+            --wait 10 \
+            --ignore-conflicts \
+            --verbose
