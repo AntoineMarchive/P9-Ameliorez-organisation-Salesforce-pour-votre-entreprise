@@ -13,7 +13,6 @@ private class OrderTriggerControllerTest {
             Status = 'Draft',
             EffectiveDate = Date.today(),
             Pricebook2Id = Test.getStandardPricebookId(),
-            TotalAmount = 300,
             ShipmentCost__c = 50
         );
         insert ord;
@@ -51,7 +50,6 @@ private class OrderTriggerControllerTest {
             Status = 'Draft',
             EffectiveDate = Date.today(),
             Pricebook2Id = Test.getStandardPricebookId(),
-            TotalAmount = 200,
             ShipmentCost__c = 20
         );
         insert ord;
