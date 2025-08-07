@@ -39,7 +39,7 @@ jobs:
       - name: 'Populate auth file with DEVHUB_SFDX_URL secret' # Création d'un secret pour l'authentification
         shell: bash
         run: |
-          echo ${ secrets.SFDX_HUB_USERNAME } > ./DEVHUB_SFDX_URL.txt
+          echo ${{ secrets.SFDX_HUB_USERNAME }} > ./DEVHUB_SFDX_URL.txt
           secretFileSize=$(wc -c "./DEVHUB_SFDX_URL.txt" | awk '{print $1}')
           if [ $secretFileSize == 1 ]; then
               echo "Missing DEVHUB_SFDX_URL secret. Is this workflow running on a fork?";
