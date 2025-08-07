@@ -34,38 +34,74 @@ jobs:
           npm install -g @salesforce/cli@latest
           echo "y" | sf plugins install sfdx-git-delta
 
-      # Étape 4 : Authentification sécurisée (via secrets GitHub)
-      - name: JWT Auth to Main Org
-        env:
-          SFDX_CLIENT_ID: ${{ secrets.SFDX_CLIENT_ID }}
-          SFDX_HUB_USERNAME: ${{ secrets.SFDX_HUB_USERNAME }}
-          SFDX_JWT_KEY: ${{ secrets.SFDX_JWT_KEY }}
-        run: |
-          echo "$SFDX_JWT_KEY" > server.key
-          sf org login jwt \
-            --client-id "$SFDX_CLIENT_ID" \
-            --username "$SFDX_HUB_USERNAME" \
-            --key-file server.key \
-            --alias prodOrg \
-            --set-default
 
-      # Étape 5 : Génération du delta entre les deux derniers commits
-      - name: Generate delta between commits
+# Etape 4 : Authentification sécurisée (via secrets GitHub)
+      - name: 'Populate auth file with DEVHUB_SFDX_URL secret' # Création d'un secret pour l'authentification
+        shell: bash
         run: |
-          mkdir -p .delta
-          sf sgd source delta \
-            --to "HEAD" \
-            --from "HEAD~1" \
-            --output-dir .delta \
-            --generate-delta
+          echo ${ secrets.SFDX_HUB_USERNAME } > ./DEVHUB_SFDX_URL.txt
+          secretFileSize=$(wc -c "./DEVHUB_SFDX_URL.txt" | awk '{print $1}')
+          if [ $secretFileSize == 1 ]; then
+              echo "Missing DEVHUB_SFDX_URL secret. Is this workflow running on a fork?";
+              exit 1;
+          fi
 
-      # Étape 6 : Déploiement des métadonnées générées par le delta
-      - name: Deploy metadata from delta
+      - name: 'Authenticate Dev Hub' # Connexion à Salesforce
+        run: sf org login sfdx-url -f ./DEVHUB_SFDX_URL.txt -a devhub -d
+      
+      - name: 'Generate metadata delta pull request' # Génération d'un delta entre la branche actuelle et la branche main
+        run: sf sgd source delta --to "HEAD" --from "HEAD~1" --output-dir "."
+
+      - name: 'Deploy metadata to main branch' # Déploiement des modifications
         if: github.ref == 'refs/heads/main'
-        run: |
-          sf project deploy start \
-            --target-org prodOrg \
-            --manifest .delta/package/package.xml \
-            --wait 10 \
-            --ignore-conflicts \
-            --verbose
+        run: sf project deploy start --target-org devhub -x package/package.xml
+
+
+
+
+
+
+
+
+      # # Étape 4 : Authentification sécurisée (via secrets GitHub). a essayer de realiser avec les 3 secrets suivants : SFDX_CLIENT_ID, SFDX_HUB_USERNAME, SFDX_JWT_KEY
+      # - name: JWT Auth to Main Org
+      #   env:
+      #     # SFDX_CLIENT_ID: ${{ secrets.SFDX_CLIENT_ID }}
+      #     SFDX_HUB_USERNAME: ${{ secrets.SFDX_HUB_USERNAME }}
+      #     # SFDX_JWT_KEY: ${{ secrets.SFDX_JWT_KEY }}
+      #   run: |
+      #     echo "$SFDX_JWT_KEY" > server.key
+      #     sf org login jwt \
+      #       --client-id "$SFDX_CLIENT_ID" \
+      #       --username "$SFDX_HUB_USERNAME" \
+      #       --key-file server.key \
+      #       --alias prodOrg \
+      #       --set-default
+
+      # # Étape 5 : Génération du delta entre les deux derniers commits
+      # - name: Generate delta between commits
+      #   run: |
+      #     mkdir -p .delta
+      #     sf sgd source delta \
+      #       --to "HEAD" \
+      #       --from "HEAD~1" \
+      #       --output-dir .delta \
+      #       --generate-delta
+
+      # # Étape 6 : Déploiement des métadonnées générées par le delta
+      # - name: Deploy metadata from delta
+      #   if: github.ref == 'refs/heads/main'
+      #   run: |
+      #     sf project deploy start \
+      #       --target-org prodOrg \
+      #       --manifest .delta/package/package.xml \
+      #       --wait 10 \
+      #       --ignore-conflicts \
+      #       --verbose
+
+
+
+
+
+
+       
